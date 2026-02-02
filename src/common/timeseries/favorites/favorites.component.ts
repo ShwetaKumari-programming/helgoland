@@ -48,7 +48,10 @@ export class TimeseriesFavoritesComponent {
   }
 
   public addToDiagram(favorite: ExtendedSingleFavorite) {
-    this.timeseriesService.addDataset(favorite.favorite.internalId);
+    // Extract timeseries ID from dataset ID for REST API 2.0.0-alpha.x
+    // Dataset IDs have format like 'quantity_71', but timeseries endpoint needs just '71'
+    const timeseriesId = this.extractTimeseriesId(favorite.favorite.internalId);
+    this.timeseriesService.addDataset(timeseriesId);
     this.router.navigateToDiagram();
   }
 
@@ -68,6 +71,34 @@ export class TimeseriesFavoritesComponent {
 
   public exportFavorites() {
     this.jsonExporter.exportFavorites();
+  }
+
+  /**
+   * Extracts the timeseries ID from a dataset internal ID.
+   * For REST API 2.0.0-alpha.x, dataset IDs have format like 'quantity_71', 'trajectory_71', etc.
+   * but the timeseries endpoint requires just the numeric ID '71'.
+   * @param internalId The dataset internal ID (may be prefixed or numeric)
+   * @returns The timeseries ID (numeric part only)
+   */
+  private extractTimeseriesId(internalId: string): string {
+    // Check if the ID contains an underscore (indicating a prefixed dataset ID)
+    const lastUnderscoreIndex = internalId.lastIndexOf('_');
+    if (lastUnderscoreIndex > 0) {
+      // Extract the numeric part after the last underscore
+      const numericPart = internalId.substring(lastUnderscoreIndex + 1);
+      // Reconstruct the internalId with just the numeric part
+      // Keep the URL part if it exists (format: url__id or url__prefix_id)
+      const doubleUnderscoreIndex = internalId.indexOf('__');
+      if (doubleUnderscoreIndex >= 0 && doubleUnderscoreIndex < lastUnderscoreIndex) {
+        // Has URL prefix: keep it and append numeric ID
+        return internalId.substring(0, doubleUnderscoreIndex + 2) + numericPart;
+      } else {
+        // No URL prefix or URL is entire part before underscore: return just numeric part
+        return numericPart;
+      }
+    }
+    // No underscore found, return as-is (already numeric or different format)
+    return internalId;
   }
 
   private loadFavorites() {

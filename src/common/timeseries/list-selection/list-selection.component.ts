@@ -1,14 +1,14 @@
 import { AfterViewInit, ChangeDetectorRef, Component, OnInit, ViewChild, ViewEncapsulation } from '@angular/core';
 import {
-  BlacklistedService,
-  DatasetApi,
-  DatasetType,
-  HelgolandDataset,
-  HelgolandParameterFilter,
-  Provider,
-  Service,
-  Settings,
-  SettingsService,
+    BlacklistedService,
+    DatasetApi,
+    DatasetType,
+    HelgolandDataset,
+    HelgolandParameterFilter,
+    Provider,
+    Service,
+    Settings,
+    SettingsService,
 } from '@helgoland/core';
 import { ListSelectorParameter, MultiServiceFilterEndpoint } from '@helgoland/selector';
 import { NgbTabChangeEvent, NgbTabset } from '@ng-bootstrap/ng-bootstrap';
@@ -134,7 +134,40 @@ export class TimeseriesListSelectionComponent implements OnInit, AfterViewInit {
   }
 
   public onDatasetSelected(datasetList: Array<HelgolandDataset>) {
-    datasetList.forEach(e => this.timeseriesService.addDataset(e.internalId));
+    datasetList.forEach(e => {
+      // Extract timeseries ID from dataset ID for REST API 2.0.0-alpha.x
+      // Dataset IDs have format like 'quantity_71', but timeseries endpoint needs just '71'
+      const timeseriesId = this.extractTimeseriesId(e.internalId);
+      this.timeseriesService.addDataset(timeseriesId);
+    });
     this.router.navigateToDiagram();
+  }
+
+  /**
+   * Extracts the timeseries ID from a dataset internal ID.
+   * For REST API 2.0.0-alpha.x, dataset IDs have format like 'quantity_71', 'trajectory_71', etc.
+   * but the timeseries endpoint requires just the numeric ID '71'.
+   * @param internalId The dataset internal ID (may be prefixed or numeric)
+   * @returns The timeseries ID (numeric part only)
+   */
+  private extractTimeseriesId(internalId: string): string {
+    // Check if the ID contains an underscore (indicating a prefixed dataset ID)
+    const lastUnderscoreIndex = internalId.lastIndexOf('_');
+    if (lastUnderscoreIndex > 0) {
+      // Extract the numeric part after the last underscore
+      const numericPart = internalId.substring(lastUnderscoreIndex + 1);
+      // Reconstruct the internalId with just the numeric part
+      // Keep the URL part if it exists (format: url__id or url__prefix_id)
+      const doubleUnderscoreIndex = internalId.indexOf('__');
+      if (doubleUnderscoreIndex >= 0 && doubleUnderscoreIndex < lastUnderscoreIndex) {
+        // Has URL prefix: keep it and append numeric ID
+        return internalId.substring(0, doubleUnderscoreIndex + 2) + numericPart;
+      } else {
+        // No URL prefix or URL is entire part before underscore: return just numeric part
+        return numericPart;
+      }
+    }
+    // No underscore found, return as-is (already numeric or different format)
+    return internalId;
   }
 }
